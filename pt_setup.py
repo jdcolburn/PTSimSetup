@@ -8,7 +8,7 @@ sigma=0.025 # parameter for switching functionfor CV (currently in A)
 
 # if no arguments passed, print help
 if len(sys.argv) == 1:
-    print('usage: python measure-cec-mdanal.py ref.pdb --initial (resid) --target (resid)')
+    print('usage: python pt_setup.py ref.pdb --initial (resid) --target (resid)')
 
 
     print('\n\t--initial\tinitial site residue ID') 
@@ -18,9 +18,9 @@ if len(sys.argv) == 1:
     print('\t--write\t\twrite pdb and ndx files for frames where CV > argument (optional)\n')
     exit()
 
-# raise error if reference structure is not a pdb file
+# raise error if reference structure is not a pdb file or a gro file
 if sys.argv[1][-4:] != '.pdb':
-    print('reference structure must be a pdb file')
+    print('reference structure must be a pdb file, i havent tested this with gro files')
     exit()
 # check that user has specified initial and target sites
 if '--initial' not in sys.argv or '--target' not in sys.argv:
@@ -35,7 +35,6 @@ if '--write' in sys.argv:
     write = True
 else:
     write = False
-
 
 # get arguments (reference structure, initial site, target site)
 reference_structure = sys.argv[1]
@@ -54,11 +53,11 @@ u = mda.Universe(reference_structure, trajectory)
 for ts in u.trajectory:
 
     QMheavy = u.select_atoms('((resid %s or resid %s) and protein and (name O*) and not backbone)' % (initial_site_resid, target_site_resid)) \
-    + u.select_atoms('(name O* and resname TIP3 and cyzone 6 6 -6 ((resid %s or resid %s) and protein))' % (initial_site_resid, target_site_resid)) 
+    + u.select_atoms('(name O* and (resname TIP3 or resname SOL) and cyzone 6 6 -6 ((resid %s or resid %s) and protein))' % (initial_site_resid, target_site_resid)) 
     #+ u.select_atoms('((resid 281 or resid 280 or resid 134 or resid 335 or resid 173) and protein and (name O* or name N*) and not backbone) ', updating=True)
 
     QMhydrogen = u.select_atoms('(resid %s or resid %s) and protein and (name HD* or name HE*) and not backbone' % (initial_site_resid, target_site_resid)) \
-    + u.select_atoms('(byres (name O* and resname TIP3 and cyzone 6 6 -6 ((resid %s or resid %s) and protein))) and name H*' % (initial_site_resid, target_site_resid)) 
+    + u.select_atoms('(byres (name O* and (resname TIP3 or resname SOL) and cyzone 6 6 -6 ((resid %s or resid %s) and protein))) and name H*' % (initial_site_resid, target_site_resid)) 
     #+ u.select_atoms('((resid 281 or resid 280 or resid 134 or resid 335 or resid 173) and protein and (name HZ* or name HH) and not backbone)', updating=True)
 
     # QMall
@@ -213,15 +212,21 @@ for ts in u.trajectory:
             # write a gromacs index file with all the QM CEC atoms
             with open('frame-%s.ndx' % ts.frame, 'w') as f:
                 f.write('[QM-CEC-atoms]\n')
-                QMlist = np.sort(np.array(QMall.atoms.ids))
+                QMlist = np.sort(np.array(QMall.atoms.indices))
                 for atom in QMlist:
-                    f.write('%s ' % atom)
+                    f.write('%s ' % int(atom + 1))
                 f.write('\n\n')
 
     ############################################################################################################################
 
     # if debug flag is set to true, print out everything below
     if debug == True :
+
+        # check atoms
+        print('\n')
+        for atom in QMall:
+            print('\tIndex:', atom.index, 'ID:', atom.id, ' resID:', atom.resid, 'resname', atom.resname)
+        print('\n')
 
         # DEBUG PRINTOUTS
         #set print preferences to 3 dp
