@@ -1,6 +1,8 @@
 import MDAnalysis as mda
 import sys
 
+# reference pdb structure should contain the QM region only (or the subset of the QM atoms for which to evaluate the CEC)
+
 rsw=0.125    # switching function parameters for heavy atoms (currently in nm)
 dsw=0.004    # switching function parameters for heavy atoms (currently in nm)
 sigma=0.0025 # parameter for switching functionfor CV (currently in nm)
@@ -18,6 +20,9 @@ if '--initial' not in sys.argv or '--target' not in sys.argv:
 reference_structure = sys.argv[1]
 initial_site_resid = sys.argv[sys.argv.index('--initial')+1]
 target_site_resid = sys.argv[sys.argv.index('--target')+1]
+
+# print message
+print('\n Warning: This script is designed to take a pdb file of QM atoms only - whatever you pass the script will be included in the CEC variable definition. \n Best to pass it a structure file created from the index group you reference in the .mdp file')
 
 # md analysis universe object
 u = mda.Universe(reference_structure)
