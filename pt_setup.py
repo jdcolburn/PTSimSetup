@@ -69,7 +69,7 @@ for ts in u.trajectory:
             print('residue %s is not present in reference structure' % site)
             exit()
             # can also be ASPH or GLUH
-        if u.select_atoms('resid %s' % site).residues[0].resname in ('ASP', 'ASPH'):
+        if u.select_atoms('resid %s' % site).residues[0].resname in ('ASP', 'ASPH', 'ASH'):
             cv_atoms = u.select_atoms('resid %s and name OD*' % site)
         elif u.select_atoms('resid %s' % site).residues[0].resname in ('GLU', 'GLUH'):
             cv_atoms = u.select_atoms('resid %s and name OE*' % site)
@@ -89,10 +89,10 @@ for ts in u.trajectory:
             exit()
 
     # raise error if one of the sites is not an ASP or GLU because i haven't implemented the other residues yet
-    if initial_cv_atoms.residues[0].resname not in ('ASP', 'ASPH', 'GLU', 'GLUH'):
+    if initial_cv_atoms.residues[0].resname not in ('ASP', 'ASPH', 'GLU', 'GLUH', 'ASH'):
         print('initial site must be an ASP or GLU residue (currently only ASP and GLU are supported)')
         exit()
-    if target_cv_atoms.residues[0].resname not in ('ASP', 'ASPH', 'GLU', 'GLUH'):
+    if target_cv_atoms.residues[0].resname not in ('ASP', 'ASPH', 'GLU', 'GLUH', 'ASH'):
         print('target site must be an ASP or GLU residue (currently only ASP and GLU are supported)')
         exit()
 
