@@ -17,6 +17,12 @@ if '--initial' not in sys.argv or '--target' not in sys.argv:
     print('please specify initial and target sites using flags --initial and --target')
     exit()
 
+# flag for debugging
+if '--debug' in sys.argv:
+    debug = True
+else:
+    debug = False
+
 # get arguments (reference structure, initial site, target site)
 reference_structure = sys.argv[1]
 initial_site_resid = sys.argv[sys.argv.index('--initial')+1]
@@ -24,7 +30,8 @@ target_site_resid = sys.argv[sys.argv.index('--target')+1]
 reference_structure_2 = sys.argv[sys.argv.index('--full_pdb')+1]
 
 # print message
-print('\n Warning: This script is designed to take a pdb file of QM atoms only - whatever you pass the script will be included in the CEC variable definition. \n Best to pass it a structure file created from the index group you reference in the .mdp file\n')
+print('\n Warning: This script is designed to take a pdb file of QM atoms only - whatever you pass the script will be included in the CEC variable definition. \n Best to pass it a structure file created from the index group you reference in the .mdp file.\n')
+print('\n Always check if the atoms being matched are indeed those you expect to see in the definition of the CEC based on your QM region - use the debug flag to check.\n')
 
 # md analysis universe object
 u = mda.Universe(reference_structure)
@@ -495,76 +502,69 @@ with open('plumed-cec.dat', 'w') as f:
     f.write('METAD ARG=CV SIGMA=%s HEIGHT=%s PACE=%s FILE=HILLS GRID_MIN=%s GRID_MAX=%s TEMP=%s BIASFACTOR=%s LABEL=metad\n' % (sigma_mtd, height, pace, grid_min, grid_max, temp, biasfactor))
     f.write('\n')
 
+    if debug == True:
+        
+        # DEBUGGING PRINTOUTS ########################################################################################
+        f.write('\n#debugging printouts\n\n')
+        f.write('\n# variables\n')
+        f.write('PRINT STRIDE=1 ARG=RD_final,RE_final,RDE_final FILE=SUMMED_TERMS_CV\n')
+        f.write('PRINT STRIDE=1 ARG=qm_centre_of_excess_charge_x,qm_centre_of_excess_charge_y,qm_centre_of_excess_charge_z FILE=CEC\n')
+        f.write('PRINT STRIDE=1 ARG=qm_hydrogen_sum_x,qm_hydrogen_sum_y,qm_hydrogen_sum_z FILE=SUM_HYD \n')
+        f.write('PRINT STRIDE=1 ARG=qm_heavy_weighted_sum_x,qm_heavy_weighted_sum_y,qm_heavy_weighted_sum_z FILE=SUM_HEAVY \n')
+        f.write('PRINT STRIDE=1 ARG=qm_pairwise_scaled_vectors_x,qm_pairwise_scaled_vectors_y,qm_pairwise_scaled_vectors_z FILE=SUM_CROSS\n')
+        #f.write('PRINT STRIDE=1 ARG=W1,RA1_B1_Asorted_Bsorted,W2,RA1_B2_Asorted_Bsorted,W3,RA2_B1_Asorted_Bsorted,W4,RA2_B2_Asorted_Bsorted FILE=weights\n')
+        f.write('PRINT STRIDE=1 ARG=W1,W2,W3,W4,RD1E1,RD1E2,RD2E1,RD2E2,RDE_final FILE=WEIGHTS\n')
+        # COG/COM of all heavy atoms
+        f.write('PRINT ARG=position_qm_com.x,position_qm_com.y,position_qm_com.z FILE=QMCOM\n\n')
+        #for atom in initial_cv_atoms:
+        #    if atom == initial_cv_atoms[-1]:
+        #        f.write('%s-qm_cec_distance FILE=QMCEC_DIST_INITIAL\n' % (atom.id))
+        #    else:
+        #        f.write('%s-qm_cec_distance,' % (atom.id))
+        #f.write('PRINT STRIDE=1 ARG=')
+        #for atom in target_cv_atoms:
+        #    if atom == target_cv_atoms[-1]:
+        #        f.write('%s-qm_cec_distance FILE=QMCEC_DIST_TARGET\n' % (atom.id))
+        #    else:
+        #        f.write('%s-qm_cec_distance,' % (atom.id))
+        #f.write('# coords\n')
+        #write a file with all qm_hydrogen_%s_qm_heavy_%s for each atom
+        f.write('PRINT FILE=UNWEIGHTED_CROSS_SUM ARG=debug_cross_sum_x,debug_cross_sum_y,debug_cross_sum_z')
+        f.write('\n')
+        # DEBUG - SUM of all the cross distances (not vectors)
+        f.write('#unweighted cross sum distances\n')
+        f.write('debug_cross_sum_d: COMBINE ARG=')
+        for atom in QMhydrogen:
+            for heavy in QMheavy:
+                if atom == QMhydrogen[-1] and heavy == QMheavy[-1]:
+                    f.write('qm_hydrogen_%s_qm_heavy_%s_d' % (atom.id, heavy.id))
+                else:
+                    f.write('qm_hydrogen_%s_qm_heavy_%s_d,' % (atom.id, heavy.id))
+        f.write(' COEFFICIENTS=')
+        for atom in QMhydrogen:
+            for heavy in QMheavy:
+                if atom == QMhydrogen[-1] and heavy == QMheavy[-1]:
+                    f.write('1.0')
+                else:
+                    f.write('1.0,')
+        f.write(' PERIODIC=NO\n')
+        #write a file with all qm_hydrogen_%s_qm_heavy_%s for each atom
+        f.write('PRINT FILE=UNWEIGHTED_CROSS_SUM_D ARG=debug_cross_sum_d')
+        f.write('\n')
 
-
-
-
-
-
-
-
-
-    # DEBUGGING PRINTOUTS ########################################################################################
-    f.write('\n#debugging printouts\n\n')
-    f.write('\n# variables\n')
-    f.write('PRINT STRIDE=1 ARG=RD_final,RE_final,RDE_final FILE=SUMMED_TERMS_CV\n')
-    f.write('PRINT STRIDE=1 ARG=qm_centre_of_excess_charge_x,qm_centre_of_excess_charge_y,qm_centre_of_excess_charge_z FILE=CEC\n')
-    f.write('PRINT STRIDE=1 ARG=qm_hydrogen_sum_x,qm_hydrogen_sum_y,qm_hydrogen_sum_z FILE=SUM_HYD \n')
-    f.write('PRINT STRIDE=1 ARG=qm_heavy_weighted_sum_x,qm_heavy_weighted_sum_y,qm_heavy_weighted_sum_z FILE=SUM_HEAVY \n')
-    f.write('PRINT STRIDE=1 ARG=qm_pairwise_scaled_vectors_x,qm_pairwise_scaled_vectors_y,qm_pairwise_scaled_vectors_z FILE=SUM_CROSS\n')
-    #f.write('PRINT STRIDE=1 ARG=W1,RA1_B1_Asorted_Bsorted,W2,RA1_B2_Asorted_Bsorted,W3,RA2_B1_Asorted_Bsorted,W4,RA2_B2_Asorted_Bsorted FILE=weights\n')
-    f.write('PRINT STRIDE=1 ARG=W1,W2,W3,W4,RD1E1,RD1E2,RD2E1,RD2E2,RDE_final FILE=WEIGHTS\n')
-    # COG/COM of all heavy atoms
-    f.write('PRINT ARG=position_qm_com.x,position_qm_com.y,position_qm_com.z FILE=QMCOM\n\n')
-    #for atom in initial_cv_atoms:
-    #    if atom == initial_cv_atoms[-1]:
-    #        f.write('%s-qm_cec_distance FILE=QMCEC_DIST_INITIAL\n' % (atom.id))
-    #    else:
-    #        f.write('%s-qm_cec_distance,' % (atom.id))
-    #f.write('PRINT STRIDE=1 ARG=')
-    #for atom in target_cv_atoms:
-    #    if atom == target_cv_atoms[-1]:
-    #        f.write('%s-qm_cec_distance FILE=QMCEC_DIST_TARGET\n' % (atom.id))
-    #    else:
-    #        f.write('%s-qm_cec_distance,' % (atom.id))
-    #f.write('# coords\n')
-    #write a file with all qm_hydrogen_%s_qm_heavy_%s for each atom
-    f.write('PRINT FILE=UNWEIGHTED_CROSS_SUM ARG=debug_cross_sum_x,debug_cross_sum_y,debug_cross_sum_z')
-    f.write('\n')
-    # DEBUG - SUM of all the cross distances (not vectors)
-    f.write('#unweighted cross sum distances\n')
-    f.write('debug_cross_sum_d: COMBINE ARG=')
-    for atom in QMhydrogen:
-        for heavy in QMheavy:
-            if atom == QMhydrogen[-1] and heavy == QMheavy[-1]:
-                f.write('qm_hydrogen_%s_qm_heavy_%s_d' % (atom.id, heavy.id))
-            else:
-                f.write('qm_hydrogen_%s_qm_heavy_%s_d,' % (atom.id, heavy.id))
-    f.write(' COEFFICIENTS=')
-    for atom in QMhydrogen:
-        for heavy in QMheavy:
-            if atom == QMhydrogen[-1] and heavy == QMheavy[-1]:
-                f.write('1.0')
-            else:
-                f.write('1.0,')
-    f.write(' PERIODIC=NO\n')
-    #write a file with all qm_hydrogen_%s_qm_heavy_%s for each atom
-    f.write('PRINT FILE=UNWEIGHTED_CROSS_SUM_D ARG=debug_cross_sum_d')
-    f.write('\n')
-    
-    # dump hygrogen positions heavy atom positions for debugging
-    hydrogen_atoms = []
-    heavy_atoms = []
-    all_atoms = []
-    for atom in QMhydrogen:
-        hydrogen_atoms.append(atom.id)
-    for atom in QMheavy:
-        heavy_atoms.append(atom.id)
-    for atom in u.select_atoms('all'):
-        all_atoms.append(atom.id)
-    hydrogen_atoms = str(hydrogen_atoms).replace('[','').replace(']','').replace('\'','').replace(' ','')
-    heavy_atoms = str(heavy_atoms).replace('[','').replace(']','').replace('\'','').replace(' ','')
-    all_atoms = str(all_atoms).replace('[','').replace(']','').replace('\'','').replace(' ','')
-    f.write('DUMPATOMS STRIDE=1 FILE=hydrogens.gro ATOMS=%s\n' % ((hydrogen_atoms)))
-    f.write('DUMPATOMS STRIDE=1 FILE=heavyatoms.gro ATOMS=%s\n' % ((heavy_atoms)))
-    f.write('DUMPATOMS STRIDE=1 FILE=qmatoms.gro ATOMS=%s\n' % ((all_atoms)))
+        # dump hygrogen positions heavy atom positions for debugging
+        hydrogen_atoms = []
+        heavy_atoms = []
+        all_atoms = []
+        for atom in QMhydrogen:
+            hydrogen_atoms.append(atom.id)
+        for atom in QMheavy:
+            heavy_atoms.append(atom.id)
+        for atom in u.select_atoms('all'):
+            all_atoms.append(atom.id)
+        hydrogen_atoms = str(hydrogen_atoms).replace('[','').replace(']','').replace('\'','').replace(' ','')
+        heavy_atoms = str(heavy_atoms).replace('[','').replace(']','').replace('\'','').replace(' ','')
+        all_atoms = str(all_atoms).replace('[','').replace(']','').replace('\'','').replace(' ','')
+        f.write('DUMPATOMS STRIDE=1 FILE=hydrogens.gro ATOMS=%s\n' % ((hydrogen_atoms)))
+        f.write('DUMPATOMS STRIDE=1 FILE=heavyatoms.gro ATOMS=%s\n' % ((heavy_atoms)))
+        f.write('DUMPATOMS STRIDE=1 FILE=qmatoms.gro ATOMS=%s\n' % ((all_atoms)))
