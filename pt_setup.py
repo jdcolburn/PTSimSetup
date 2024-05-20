@@ -53,11 +53,11 @@ u = mda.Universe(reference_structure, trajectory)
 for ts in u.trajectory:
 
     QMheavy = u.select_atoms('((resid %s or resid %s) and protein and (name O*) and not backbone)' % (initial_site_resid, target_site_resid)) \
-    + u.select_atoms('(name O* and (resname TIP3 or resname SOL) and cyzone 6 6 -6 ((resid %s or resid %s) and protein))' % (initial_site_resid, target_site_resid)) 
+    + u.select_atoms('(name O* and (resname TIP3 or resname SOL) and cyzone 8 8 -8 ((resid %s or resid %s) and protein))' % (initial_site_resid, target_site_resid)) 
     #+ u.select_atoms('((resid 281 or resid 280 or resid 134 or resid 335 or resid 173) and protein and (name O* or name N*) and not backbone) ', updating=True)
 
     QMhydrogen = u.select_atoms('(resid %s or resid %s) and protein and (name HD* or name HE*) and not backbone' % (initial_site_resid, target_site_resid)) \
-    + u.select_atoms('(byres (name O* and (resname TIP3 or resname SOL) and cyzone 6 6 -6 ((resid %s or resid %s) and protein))) and name H*' % (initial_site_resid, target_site_resid)) 
+    + u.select_atoms('(byres (name O* and (resname TIP3 or resname SOL) and cyzone 8 8 -8 ((resid %s or resid %s) and protein))) and name H*' % (initial_site_resid, target_site_resid)) 
     #+ u.select_atoms('((resid 281 or resid 280 or resid 134 or resid 335 or resid 173) and protein and (name HZ* or name HH) and not backbone)', updating=True)
 
     # QMall
@@ -100,17 +100,27 @@ for ts in u.trajectory:
     weight_factors = {}
     for atom in QMheavy:
         if atom.name == 'OW':                           # water
-            weight_factors[atom.id] = 2.0
+            weight_factors[atom.index] = 2.0
         elif atom.name == 'OD2' or atom.name == 'OE2':  # aspartate oxygens
-            weight_factors[atom.id] = 0.0
+            weight_factors[atom.index] = 0.0
         elif atom.name == 'OD1' or atom.name == 'OE1':  # glutamate oxygens
-            weight_factors[atom.id] = 0.0
+            weight_factors[atom.index] = 0.0
         elif atom.name == 'NZ':                         # lysine
-            weight_factors[atom.id] = 3.0               
+            weight_factors[atom.index] = 3.0               
         elif atom.name == 'OH':                         # tyrosine
-            weight_factors[atom.id] = 1.0
+            weight_factors[atom.index] = 1.0
         elif atom.name == 'OH2':                        # water (alternate)
-            weight_factors[atom.id] = 2.0
+            weight_factors[atom.index] = 2.0
+        # ligand specific
+        elif atom.name == 'N' and atom.index == 42583:     # workaround for a ligand amide N
+            weight_factors[atom.index] = 1.0
+        elif atom.name == 'N' and atom.index == 42571:     # workaround for a ligand N-terminus
+            weight_factors[atom.index] = 3.0
+        elif atom.name == 'O' and atom.index == 42582:     # workaround for a ligand
+            weight_factors[atom.index] = 0.0
+        elif atom.name == 'OC1' or atom.name == 'OC2':  # workaround for a ligand
+            weight_factors[atom.index] = 0.0
+
         else:
             print('atom name not recognized')
             print(atom.name)
@@ -144,7 +154,7 @@ for ts in u.trajectory:
     # weighted sum of all heavy atom vectors (B)
     QMheavy_weighted_sum_vector = np.zeros(3)
     for atom in QMheavy:
-        QMheavy_weighted_sum_vector += weight_factors[atom.id] * atom.position
+        QMheavy_weighted_sum_vector += weight_factors[atom.index] * atom.position
 
     # sum of all scaled pairwise vectors (C)
     QMhydrogen_to_QMheavy_vectors_scaled_sum = np.sum(QMhydrogen_to_QMheavy_vectors_scaled, axis=(0,1))
@@ -209,9 +219,11 @@ for ts in u.trajectory:
            # write pdb file with all the QM CEC atoms
             with mda.Writer('frame-%s.pdb' % ts.frame, n_atoms=len(u.atoms)) as W:
                 W.write(u.atoms)
+
             # write a gromacs index file with all the QM CEC atoms
             with open('frame-%s.ndx' % ts.frame, 'w') as f:
                 f.write('[QM-CEC-atoms]\n')
+                # must sort so they are ascendiung
                 QMlist = np.sort(np.array(QMall.atoms.indices))
                 for atom in QMlist:
                     f.write('%s ' % int(atom + 1))
@@ -225,7 +237,7 @@ for ts in u.trajectory:
         # check atoms
         print('\n')
         for atom in QMall:
-            print('\tIndex:', atom.index, 'ID:', atom.id, ' resID:', atom.resid, 'resname', atom.resname)
+            print('\tIndex:', atom.index, 'ID:', atom.index, ' resID:', atom.resid, 'resname', atom.resname)
         print('\n')
 
         # DEBUG PRINTOUTS
@@ -257,7 +269,7 @@ for ts in u.trajectory:
         import matplotlib.pyplot as plt
         wf=[]
         for atom in QMheavy:
-            wf.append(weight_factors[atom.id]+1)
+            wf.append(weight_factors[atom.index]+1)
         wf=np.array(wf)
         wf=wf/np.max(wf)
         ax = plt.axes(projection='3d')
@@ -276,7 +288,7 @@ for ts in u.trajectory:
                 ax.plot3D([QMhydrogen_positions[i,0], QMheavy_positions[j,0]], [QMhydrogen_positions[i,1], QMheavy_positions[j,1]], [QMhydrogen_positions[i,2], QMheavy_positions[j,2]], color='grey', alpha=(1.0 / (1.0 + np.exp((QMhydrogen_to_QMheavy_distances[i,j] - rsw) / dsw))))
         ## a notate the heavy atoms with their weight factors
         for i in range(len(QMheavy)):
-            ax.text3D(QMheavy_positions[i,0], QMheavy_positions[i,1]+0.2, QMheavy_positions[i,2]+0.2, '%.0f' % weight_factors[QMheavy[i].id], color='black')
+            ax.text3D(QMheavy_positions[i,0], QMheavy_positions[i,1]+0.2, QMheavy_positions[i,2]+0.2, '%.0f' % weight_factors[QMheavy[i].index], color='black')
         ## now plot the CEC
         ax.scatter3D(CEC[0], CEC[1], CEC[2], color='green', marker='o')
         # label the CEC
